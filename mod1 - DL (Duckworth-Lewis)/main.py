@@ -226,7 +226,7 @@ def dl_process(approach = 'mean',lr=0.001,factor=(1/3),epochs=10**3):
 	dl_model.compile(optimizer=opt, loss=sum_squared_error)
 
 	reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=factor,
-		patience=10, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
+		patience=10, verbose=1, mode='auto', min_delta=25, cooldown=0, min_lr=0)
 
 	history = dl_model.fit(x=x_train,y=y_train,epochs=epochs,
 		batch_size=128,
@@ -241,16 +241,16 @@ def dl_process(approach = 'mean',lr=0.001,factor=(1/3),epochs=10**3):
 	with open('results.txt','a') as f:
 		print('\nEpsilon {} and Precision {}'.format(e,floatx))
 		wts = dl_model.get_weights()
-		print('L scalar is  {}'.format(wts[1])[0][0] )
-		print('Z array  is\n{}'.format(' '.join(tuple(map(str,wts[0].T[0])))) )
-		print('SSE Loss using Approach {} is {:.2f}'.format(approach,loss),file=f)
+		print('L scalar is\n{}'.format(wts[1][0][0]) ,file=f)
+		print('Z array  is\n{}'.format(' '.join(tuple(map(str,wts[0].T[0])))) ,file=f)
+		print('SSE Loss using Approach {} is {:.2f}\n'.format(approach,loss) ,file=f)
 	return dl_model, history
 
 
-m1,h1 = dl_process(approach = 'mean',    lr=0.01, factor=0.99, epochs=5*10**4)
-m2,h2 = dl_process(approach = 'sep_data',lr=0.01, factor=0.99, epochs=10**3)
+# m1,h1 = dl_process(approach = 'mean',    lr=0.01, factor=0.99, epochs=2*10**4)
+# m2,h2 = dl_process(approach = 'sep_data',lr=0.01, factor=0.99, epochs=10**3)
 
 better_precision()
 
-bm1,bh1 = dl_process(approach = 'mean',    lr=0.01,factor=0.99, epochs=5*10**4)
+bm1,bh1 = dl_process(approach = 'mean',    lr=0.01,factor=0.99, epochs=2*10**4)
 bm2,bh2 = dl_process(approach = 'sep_data',lr=0.01,factor=0.99, epochs=10**3)
