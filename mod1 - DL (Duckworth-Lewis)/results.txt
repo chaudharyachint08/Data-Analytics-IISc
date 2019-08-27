@@ -1,1 +1,0 @@
-SSE Loss using Approach mean is 5310098025.85
