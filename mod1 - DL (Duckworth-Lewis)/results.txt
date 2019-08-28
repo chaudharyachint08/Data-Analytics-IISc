@@ -1,11 +1,11 @@
-Total Data Points 67794
+Total Data Points 69217
 
 dl_model   None
-approach   sep_data
-epochs     200
-factor     0.99
-batch_size 4096
-loss       sse
+approach   mean
+epochs     2000
+factor     0.3
+batch_size 64
+loss       mse
 opt        Adam
 lr         0.01
 decay      0.0
@@ -14,8 +14,50 @@ nesterov   True
 RLRoP      True
 Epsilon 9.999999999999998e-15 and Precision float64
 L scalar is
-16.3362990411604
+11.334378234933611
 Z array  is
-9.344479100938415 25.271476568668632 46.810679094755635 69.31663445803765 92.02534530314071 119.2873823646402 139.3386993502025 160.82928989041113 173.51947046699775 182.50397545552516
- SSE Loss using Approach sep_data is 143180717.59
-RMSE Loss using Approach sep_data is 45.96
+5.421742965288405 16.13945227282087 31.734884490367996 52.0106796994552 85.2452589702551 126.98456624034972 155.39893897534708 192.9581303409133 222.75196813256275 270.9662277256509
+ SSE Loss using Approach mean is 115490008.04
+RMSE Loss using Approach mean is 40.85
+
+dl_model   None
+approach   sep_data
+epochs     100
+factor     0.3
+batch_size 64
+loss       mse
+opt        Adam
+lr         0.01
+decay      0.0
+momentum   0.9
+nesterov   True
+RLRoP      True
+Epsilon 9.999999999999998e-15 and Precision float64
+L scalar is
+11.12815376553012
+Z array  is
+9.701299976483304 26.70647814755012 50.367561386413804 78.02370741814048 103.06352843350477 136.2132364591003 166.93077763648589 205.0599505722046 236.24107609783334 267.991747947395
+ SSE Loss using Approach sep_data is 112016203.47
+RMSE Loss using Approach sep_data is 40.23
+
+Total Data Points 69217
+
+dl_model   None
+approach   sliced_data
+epochs     10
+factor     0.99
+batch_size 64
+loss       mse
+opt        Adam
+lr         0.01
+decay      0.0
+momentum   0.9
+nesterov   True
+RLRoP      True
+Epsilon 9.999999999999998e-15 and Precision float64
+L scalar is
+11.356706835611366
+Z array  is
+9.289853680426022 28.196446167131143 50.187992801397684 76.80387864984746 103.37328676283818 135.41964545384937 165.89403659438443 204.00055512799528 233.6059810545742 264.37715039104035
+ SSE Loss using Approach sliced_data is 112040516.34
+RMSE Loss using Approach sliced_data is 40.23

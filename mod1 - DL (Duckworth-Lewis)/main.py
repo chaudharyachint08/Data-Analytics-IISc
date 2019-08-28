@@ -8,6 +8,7 @@ import numpy as np, pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from matplotlib import rc
 rc('text', usetex=True)
 from matplotlib.ticker import StrMethodFormatter
@@ -44,8 +45,8 @@ get_custom_objects().update({'sse': sum_squared_error})
 
 
 # Flag for taking data for 50 overs remaining, using Innings Total
-before_first_over_mode  = False
-plot_initial_data       = False
+before_first_over_mode  = True
+plot_initial_data       = True
 call_consistent         = False
 use_consistent          = False
 if call_consistent:
@@ -219,11 +220,31 @@ def proj_tsv(frctn = 0.2,size=1,mode='2d'):
 	plt.title(title)
 	plt.grid(True)
 	plt.savefig('{} {}.PNG'.format(title2,mode),dpi=400,bbox_inches='tight',format='PNG')
-	plt.show()
+	# plt.show()
+
+	# Saving Animated GIF Image
+	if mode=='3d':
+		ax.legend().set_visible(False)
+		plt.legend(bbox_to_anchor=(0.5,1), loc="lower center", ncol=len(proj_points)//2,
+		borderaxespad=0,fancybox=True,shadow=True)
+		start_angle = 90
+		def init_func(angle=start_angle):
+			print('Converting for Angle',angle)
+			ax.view_init(azim=angle)
+		def rtt(angle):
+			angle = (angle+start_angle)%360
+			print('Converting for Angle',angle)
+			ax.view_init(azim=angle)
+		rot_animation = animation.FuncAnimation(fig=fig, func=rtt, init_func=init_func,
+			frames=np.arange(0, 180+1, 1), interval=50)
+		rot_animation.save('{} {}.GIF'.format(title2,mode), dpi=300, writer='imagemagick')
+
+	
 
 if plot_initial_data:
-	proj_tsv(1,10,'3d')
-	proj_tsv(1,10,'2d')
+	# proj_tsv(1,10,'2d')
+	proj_tsv(1,4,'3d')
+	
 
 'Writing & Projection Data Section Ends'
 
@@ -244,12 +265,12 @@ def NN_feed_postprocess_data(dict_form_data):
 
 def init_Z(shape):
 	global Z_init
-	Z_init = K.variable(mat_data.mean(axis=0)[...,np.newaxis])
+	Z_init = K.variable(mat_data.max(axis=0)[...,np.newaxis])
 	return Z_init
 
 def init_L(shape):
 	global L_init
-	L_init = K.variable(np.array([5,])[...,np.newaxis])
+	L_init = K.variable(np.array([0,])[...,np.newaxis])
 	return L_init
 
 def DL_model(*shapes):
@@ -294,7 +315,8 @@ def fit_plot(dl_model,approach = 'mean'):
 	plt.grid(True)
 	plt.legend(fancybox=True,shadow=True)
 	plt.savefig('{} {}.PNG'.format(title2,approach),dpi=400,bbox_inches='tight',format='PNG')
-	plt.show()
+	# plt.show()
+	plt.close()
 
 def dl_process(dl_model=None, approach = 'mean',epochs=10**3,factor=(1/3),batch_size=32,
 	loss='mse',opt='Adam',lr=0.001,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True):
@@ -315,7 +337,7 @@ def dl_process(dl_model=None, approach = 'mean',epochs=10**3,factor=(1/3),batch_
 	dl_model.compile(optimizer=opt, loss=loss)
 
 	reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=factor,
-		patience=10, verbose=1, mode='auto', min_delta=0.001, cooldown=0, min_lr=0)
+		patience=10, verbose=1, mode='auto', min_delta=0.1, cooldown=0, min_lr=0)
 
 	if approach=='mean':
 		history = dl_model.fit(x=x_train,y=y_train,epochs=epochs,
@@ -356,11 +378,10 @@ def dl_process(dl_model=None, approach = 'mean',epochs=10**3,factor=(1/3),batch_
 		print('Z array  is\n{}'.format(' '.join(tuple(map(str,wts[0].T[0])))) ,file=f)
 		
 		print(' SSE Loss using Approach {} is {:.2f}'.format(approach,loss) ,file=f)
-		print('RMSE Loss using Approach {} is {:.2f}'.format(
+		print('RMSE Loss using Approach {} is {:.2f}\n'.format(
 			approach,np.sqrt(loss/y_pred_r.shape[0])) ,file=f)
-	fit_plot(dl_model)
+	fit_plot(dl_model, approach = approach)
 	return dl_model
-
 
 'Data Encoding & Keras Model Section Ends'
 
@@ -372,14 +393,18 @@ def dl_process(dl_model=None, approach = 'mean',epochs=10**3,factor=(1/3),batch_
 
 better_precision()
 
-m1 = dl_process(approach = 'sep_data',epochs=2*10**2,factor=0.99,batch_size=4096,
-	loss='sse',opt='Adam',lr=0.01,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True)
-
-m2 = dl_process(approach = 'sliced_data',epochs=1*10**1,factor=0.99,batch_size=32,
-	loss='sse',opt='Adam',lr=0.01,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True)
-
-m3 = dl_process(approach = 'mean',epochs=5*10**3,factor=0.99,batch_size=64,
-	loss='sse',opt='Adam',lr=0.1,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True)
-
 with open('results.txt','a') as f:
 	print('Total Data Points',mat_count.sum(),end='\n\n',file=f)
+
+
+# m1 = dl_process(approach = 'mean',       epochs=2*10**3,factor=0.3,batch_size=64,
+# 	loss='mse',opt='Adam',lr=0.01,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True)
+
+
+# m2 = dl_process(approach = 'sep_data',   epochs=1*10**2,factor=0.3,batch_size=64,
+# 	loss='mse',opt='Adam',lr=0.01,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True)
+
+# m3 = dl_process(approach = 'sliced_data',epochs=1*10**1,factor=0.99,batch_size=64,
+# 	loss='mse',opt='Adam',lr=0.01,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True)
+
+
