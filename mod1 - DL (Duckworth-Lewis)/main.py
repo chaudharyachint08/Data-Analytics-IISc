@@ -1,7 +1,9 @@
-import os, sys, shutil, itertools as it
+import os, sys, shutil, argparse, inspect
 from datetime import datetime
+from copy import deepcopy
 
 import numpy as np, pandas as pd
+
 
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib as mpl
@@ -13,9 +15,13 @@ from matplotlib.ticker import StrMethodFormatter
 
 import tensorflow
 import keras
-from keras.layers import Input, Dense, Multiply, Lambda
+from keras.layers import Input, Dense, Add, Subtract, Multiply, Lambda
 from keras.layers import Dropout, Activation, BatchNormalization
 from keras.models import Model
+
+
+
+'Libraries API based Utilities Section Begins'
 
 from keras import backend as K
 from keras.utils.generic_utils import get_custom_objects
@@ -24,51 +30,117 @@ e, floatx = K.epsilon(), K.floatx()
 
 def better_precision():
 	global e, floatx	
-	e, floatx = e*(10**(-2)), 'float64'
+	e, floatx = e**2, 'float64'
 	K.set_epsilon(e)
 	K.set_floatx(floatx)
-
-def exp_activation(x):
-	return K.exp(x)
 
 def sum_squared_error(y_true, y_pred):
 	return K.sum(K.square(y_true - y_pred))
 
-get_custom_objects().update({'exp_activation': Activation(exp_activation)})
+get_custom_objects().update({'sum_squared_error': sum_squared_error})
+get_custom_objects().update({'sse': sum_squared_error})
 
+'Libraries API based Utilities Section Ends'
+
+
+# Flag for taking data for 50 overs remaining, using Innings Total
+before_first_over_mode  = False
+plot_initial_data       = False
+call_consistent         = False
+use_consistent          = False
+if call_consistent:
+	use_consistent      = True
+
+# Variables can be set & Called via command
+# approach = 'mean'
+# epochs=10**3,factor=(1/3),
+# opt='Adam',lr=0.001,decay=0.0,momentum=0.9,nesterov=True
+
+
+
+'Reading Dataset & Making it More Consistent Section Begins'
 
 data_df = pd.read_csv('04_cricket_1999to2011.csv')
-print(data_df.columns)
+# print(data_df.columns)
 
+def consistent_df():
+	R,C = data_df.shape
+	# Pointers to be set at startting and end of Innings
+	innings_count, start, end = 0, 0, 0
+	while start < R:
+		end = start
+		while (end+1<R) and (data_df['Innings'][end+1]==data_df['Innings'][start]):
+			end += 1
+		
+		for cur in range(start+1,end):
+			prev_A, prev_B = data_df['Runs'][cur-1], data_df['Innings.Total.Runs'][cur-1]
+			cur_A,  cur_B  = data_df['Runs'][cur],   data_df['Innings.Total.Runs'][cur]
+			next_A, next_B = data_df['Runs'][cur+1], data_df['Innings.Total.Runs'][cur+1]
+
+			# Assuming wrong key presses, checking what can ho wrong
+			if ((prev_A+prev_B) != (cur_B)) and ((cur_A+cur_B) != (next_B)):
+				# Only cur_b is wrong at its place
+				if (next_B-next_A)==(prev_A+prev_B):
+					cur_B = prev_A+prev_B
+				else:
+					dc_conv = lambda x: dict( (i,str(x).count(i)) for i in set(str(x)) )
+					dc_adds = lambda x: dict(())
+					dc_absd = lambda x: sum(x)
+
+					dc_prev_A, dc_prev_B = dc_conv(prev_A), dc_conv(prev_B)
+					dc_cur_A,  dc_cur_B  = dc_conv(cur_A),  dc_conv(cur_B)
+					dc_next_A, dc_next_B = dc_conv(next_A), dc_conv(next_B)
+				data_df.loc[cur,  'Innings.Total.Runs'] = cur_B
+			prev_A, prev_B = cur_A, cur_B
+		#print(start,end)
+		innings_count +=1
+		start = end+1
+
+if call_consistent:
+	consistent_df()
+	data_df.to_csv( '04_cricket_1999to2011_consistent.csv', index=False)
+if use_consistent:
+	data_df = pd.read_csv('04_cricket_1999to2011_consistent.csv')
+
+'Reading Dataset & Making it More Consistent Section Ends'
+
+'''
 col_ix = {}
 for i in ['Innings','Over','Total.Overs','Innings.Total.Runs','Total.Runs','Wickets.in.Hand']:
 	col_ix[i] = list(data_df.columns).index(i)
+'''
+
+'Data Storage & Collection Section Begins'
 
 ING = np.array(data_df['Innings'])
 OL  = np.array(data_df['Total.Overs'])        - np.array(data_df['Over'])
 WIH = np.array(data_df['Wickets.in.Hand'])
 RM  = np.array(data_df['Innings.Total.Runs']) - np.array(data_df['Total.Runs'])
 
-for i in ['ING','OL','WIH','RM']:
-	print(i,eval('{}.min()'.format(i)),eval('{}.max()'.format(i)))
+# for i in ['ING','OL','WIH','RM']:
+# 	print(i,eval('{}.min()'.format(i)),eval('{}.max()'.format(i)))
 
-'''
-ING 1 2 
-OL 0 49 # can be used as 50 columns
-WIH 0 10
-RM -1 435
-'''
-
-mat_data,mat_count  = np.zeros((50,10)), np.zeros((50,10))
+if before_first_over_mode:
+	mat_data,mat_count  = np.zeros((51,10)), np.zeros((51,10),dtype=int)
+else:
+	mat_data,mat_count  = np.zeros((50,10)), np.zeros((50,10),dtype=int)
 dict_data = {}
 metadata_columns = ['WIH']
 projection_data,projection_metadata = [],[]
 
 for i in range(len(ING)):
+	any_condition_entered = True
 	if ING[i]==1:
 		# Having 1 or 0 wicket in hand is same thing
-		x,y = OL[i], max(WIH[i],1)-1
-		mat_data[x][y]  += RM[i]
+		x,y,z = OL[i], max(WIH[i],1)-1, RM[i]
+		last_was_1st_inning = True
+	elif before_first_over_mode and (ING[i]==2) and last_was_1st_inning:
+		x, y, z = 50, (10-1), data_df['Innings.Total.Runs'][i-1]
+		last_was_1st_inning = False
+	else:
+		any_condition_entered = False
+	if any_condition_entered:
+		mat_data[x][y]  += z
 		mat_count[x][y] += 1
 		if (x,y) in dict_data:
 			dict_data[(x,y)].append(RM[i])
@@ -80,6 +152,11 @@ mat_data = np.where(mat_count,mat_data/mat_count,0)
 # 500 point approach, similar to all point approach
 dict_mat_data = { (x,y):[mat_data[x][y]] for x in range(mat_data.shape[0]) for y in range(mat_data.shape[1])}
 
+'Data Storage & Collection Section Ends'
+
+
+
+'Writing & Projection Data Section Begins'
 
 def write_proj_tsv():
 	proj_d_df  = pd.DataFrame(data=projection_data,    columns=['OL','WIH','RM'])
@@ -122,8 +199,8 @@ def proj_tsv(frctn = 0.2,size=1,mode='2d'):
 			temp = temp[:int(np.round(frctn*len(temp)))]
 			xs,ys,zs = tuple(np.array(temp).T)
 			ax.scatter(xs, ys, zs, label=r'$Z_{{{}}}$'.format(int(wih+1)), marker='o', s=size)
-		ax.set_xlabel('Overs Left')
-		plt.ylabel('Runs Scored')
+		ax.set_xlabel('Overs Remaining')
+		plt.ylabel('Wickets In Hand')
 		plt.yticks(np.linspace(1,10,10),np.linspace(1,10,10,dtype=int))
 		ax.set_zlabel('Runs Made')
 		plt.legend(bbox_to_anchor=(0.5,1), loc="lower center", ncol=len(proj_points),
@@ -133,7 +210,7 @@ def proj_tsv(frctn = 0.2,size=1,mode='2d'):
 		for wih in proj_points:
 			xs,ys,zs = tuple(np.array(proj_points[wih]).T)
 			plt.plot(xs, zs,label=r'$Z_{{{}}}$'.format(int(wih+1)))
-		plt.xlabel('Overs Left')
+		plt.xlabel('Overs Remaining')
 		plt.ylabel('Runs Scored')
 		plt.legend(fancybox=True,shadow=True)
 
@@ -144,11 +221,16 @@ def proj_tsv(frctn = 0.2,size=1,mode='2d'):
 	plt.savefig('{} {}.PNG'.format(title2,mode),dpi=400,bbox_inches='tight',format='PNG')
 	plt.show()
 
-# proj_tsv(1,10,'3d')
-# proj_tsv(1,10,'2d')
+if plot_initial_data:
+	proj_tsv(1,10,'3d')
+	proj_tsv(1,10,'2d')
+
+'Writing & Projection Data Section Ends'
 
 
-# dict_mat_data = { (x,y):[mat_data[x][y]] for x in range(mat_data.shape[0]) for y in range(mat_data.shape[1])}
+
+'Data Encoding & Keras Model Section Begins'
+
 def NN_feed_postprocess_data(dict_form_data):
 	X_wih, X_ol, Y_rm = [],[],[]
 	for ol,wih in dict_form_data:
@@ -167,7 +249,7 @@ def init_Z(shape):
 
 def init_L(shape):
 	global L_init
-	L_init = K.variable(np.array([1,])[...,np.newaxis])
+	L_init = K.variable(np.array([5,])[...,np.newaxis])
 	return L_init
 
 def DL_model(*shapes):
@@ -180,7 +262,7 @@ def DL_model(*shapes):
 	
 	NUM   = L(X_inputs[1])
 	DENOM = Z(X_inputs[0])
-	X = Lambda( lambda x:(x[0]/x[1]) )([NUM,DENOM])
+	X = Lambda( lambda x:(-1*x[0]/x[1]) )([NUM,DENOM])
 	X = Lambda( lambda x:K.exp(x) )(X)
 	X = Lambda( lambda x:1-x )(X)
 	X = Multiply()([ X_inputs[0] , X ])
@@ -188,13 +270,13 @@ def DL_model(*shapes):
 	model   = Model(inputs = X_inputs, outputs = X, name='DL_model')
 	return model
 
-
 def fit_plot(dl_model,approach = 'mean'):
 	for wih in range(mat_data.shape[1]):
 		_ = [0]*mat_data.shape[1]
 		_[wih] = 1
 		X_wih, X_ol = [], []
-		for ol in range(mat_data.shape[0]):
+		# Plot for [0,50] instead of [0,49]
+		for ol in range(mat_data.shape[0]+(0 if before_first_over_mode else 1)):
 			X_wih.append(_)
 			X_ol.append([ol])
 		_ = [0]*mat_data.shape[1]
@@ -205,52 +287,99 @@ def fit_plot(dl_model,approach = 'mean'):
 
 	title  = r'Run Scoring Fucntion of $1^{st}$ Innings'
 	title2 = 'Run Scoring Fucntion of 1st Innings'
-	plt.xlabel('Overs Left')
+	plt.xlabel('Overs Remaining')
 	plt.ylabel('Runs Scored')
-	# plt.ylabel('Scoring Potential Left')
+	# plt.ylabel('Scoring Potential Remaining')
 	plt.title(title)
 	plt.grid(True)
 	plt.legend(fancybox=True,shadow=True)
 	plt.savefig('{} {}.PNG'.format(title2,approach),dpi=400,bbox_inches='tight',format='PNG')
 	plt.show()
 
-def dl_process(approach = 'mean',lr=0.001,factor=(1/3),epochs=10**3):
+def dl_process(dl_model=None, approach = 'mean',epochs=10**3,factor=(1/3),batch_size=32,
+	loss='mse',opt='Adam',lr=0.001,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True):
+	lcls = deepcopy(locals())
+	global x_train, y_train
 	# Data set preprocessing section
 	x_train, y_train = NN_feed_postprocess_data(dict_mat_data if approach=='mean' else dict_data)
 
 	# Model Building Section
-	dl_model = DL_model((mat_data.shape[1],),(1,))
+	if dl_model is None:
+		dl_model = DL_model((mat_data.shape[1],),(1,))
 
 	# Training Section
-	opt = keras.optimizers.Adam( lr=lr, decay=0.0 )
-	dl_model.compile(optimizer=opt, loss=sum_squared_error)
+	if opt=='SGD':
+		opt = keras.optimizers.SGD( lr=lr, decay=decay, momentum=momentum, nesterov=nesterov)
+	else:
+		opt = keras.optimizers.Adam( lr=lr, decay=decay )
+	dl_model.compile(optimizer=opt, loss=loss)
 
 	reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=factor,
-		patience=10, verbose=1, mode='auto', min_delta=25, cooldown=0, min_lr=0)
+		patience=10, verbose=1, mode='auto', min_delta=0.001, cooldown=0, min_lr=0)
 
-	history = dl_model.fit(x=x_train,y=y_train,epochs=epochs,
-		batch_size=128,
-		shuffle=True,callbacks=[reduce_lr])
-		# batch_size=len((dict_mat_data if approach=='mean' else dict_data)),
+	if approach=='mean':
+		history = dl_model.fit(x=x_train,y=y_train,epochs=epochs,
+			batch_size=batch_size, shuffle=True,
+			callbacks=([reduce_lr] if RLRoP else []))
+	elif approach=='sep_data':
+		history = dl_model.fit(x=x_train,y=y_train,epochs=epochs,
+			batch_size=batch_size, shuffle=True,
+			callbacks=([reduce_lr] if RLRoP else []))
+	elif approach=='sliced_data':
+		ls = list(range(mat_data.shape[1]))
+		for i in range(epochs):
+			print('Sliced Epoch',i+1)
+			np.random.shuffle(ls)
+			for i in ls:
+				_ = mat_count.sum(axis=0)
+				start_ix, end_ix = _[:i].sum(), _[:i+1].sum()
+				# print((i,start_ix,end_ix),end=' ')
+				x_train2, y_train2 = [[],[]], []
+				x_train2[0] = x_train[0][start_ix:end_ix]
+				x_train2[1] = x_train[1][start_ix:end_ix]
+				y_train2    =    y_train[start_ix:end_ix]
+				history = dl_model.fit(x=x_train2,y=y_train2,epochs=epochs,
+					batch_size=batch_size, shuffle=True,
+					callbacks=([reduce_lr] if RLRoP else []))
 
-	history = history.history
+	# history = history.history
 
-	fit_plot(dl_model)
-	y_pred = dl_model.predict(x_train)
-	loss = np.sum(np.square( y_train - y_pred ))
+	x_train_r, y_train_r = NN_feed_postprocess_data(dict_data)
+	y_pred_r = dl_model.predict(x_train_r)
+	loss = np.sum(np.square( y_train_r - y_pred_r ))
 	with open('results.txt','a') as f:
-		print('\nEpsilon {} and Precision {}'.format(e,floatx))
+		print( *( '{:10s} {}'.format(x,lcls[x]) for x in lcls), sep='\n',file=f )
+		print('Epsilon {} and Precision {}'.format(e,floatx),file=f)
 		wts = dl_model.get_weights()
+		
 		print('L scalar is\n{}'.format(wts[1][0][0]) ,file=f)
 		print('Z array  is\n{}'.format(' '.join(tuple(map(str,wts[0].T[0])))) ,file=f)
-		print('SSE Loss using Approach {} is {:.2f}\n'.format(approach,loss) ,file=f)
-	return dl_model, history
+		
+		print(' SSE Loss using Approach {} is {:.2f}'.format(approach,loss) ,file=f)
+		print('RMSE Loss using Approach {} is {:.2f}'.format(
+			approach,np.sqrt(loss/y_pred_r.shape[0])) ,file=f)
+	fit_plot(dl_model)
+	return dl_model
 
 
-# m1,h1 = dl_process(approach = 'mean',    lr=0.01, factor=0.99, epochs=2*10**4)
-# m2,h2 = dl_process(approach = 'sep_data',lr=0.01, factor=0.99, epochs=10**3)
+'Data Encoding & Keras Model Section Ends'
+
+
+
+# with open('results.txt','w') as f:
+# 	pass
+
 
 better_precision()
 
-bm1,bh1 = dl_process(approach = 'mean',    lr=0.01,factor=0.99, epochs=2*10**4)
-bm2,bh2 = dl_process(approach = 'sep_data',lr=0.01,factor=0.99, epochs=10**3)
+m1 = dl_process(approach = 'sep_data',epochs=2*10**2,factor=0.99,batch_size=4096,
+	loss='sse',opt='Adam',lr=0.01,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True)
+
+m2 = dl_process(approach = 'sliced_data',epochs=1*10**1,factor=0.99,batch_size=32,
+	loss='sse',opt='Adam',lr=0.01,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True)
+
+m3 = dl_process(approach = 'mean',epochs=5*10**3,factor=0.99,batch_size=64,
+	loss='sse',opt='Adam',lr=0.1,decay=0.0,momentum=0.9,nesterov=True,RLRoP=True)
+
+with open('results.txt','a') as f:
+	print('Total Data Points',mat_count.sum(),end='\n\n',file=f)
