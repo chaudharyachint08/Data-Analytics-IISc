@@ -165,7 +165,7 @@ def write_proj_tsv():
 	proj_d_df.to_csv( 'projection_data.tsv', index=False, sep='\t')
 	proj_md_df.to_csv('projection_metadata.tsv', index=False, sep='\t')
 
-def proj_tsv(frctn = 0.2,size=1,mode='2d'):
+def proj_tsv(frctn = 0.2,size=1,mode='2d',gif_plot=False):
 	'Data Points based on WIH'
 	proj_points = {}
 	if mode=='3d':
@@ -223,7 +223,7 @@ def proj_tsv(frctn = 0.2,size=1,mode='2d'):
 	# plt.show()
 
 	# Saving Animated GIF Image
-	if mode=='3d':
+	if gif_plot and mode=='3d':
 		ax.legend().set_visible(False)
 		plt.legend(bbox_to_anchor=(0.5,1), loc="lower center", ncol=len(proj_points)//2,
 		borderaxespad=0,fancybox=True,shadow=True)
@@ -243,7 +243,7 @@ def proj_tsv(frctn = 0.2,size=1,mode='2d'):
 
 if plot_initial_data:
 	# proj_tsv(1,10,'2d')
-	proj_tsv(1,4,'3d')
+	proj_tsv(1,10,'3d')
 	
 
 'Writing & Projection Data Section Ends'
