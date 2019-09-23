@@ -7,6 +7,9 @@ from scipy.stats.mstats import gmean
 from numpy              import mean as amean
 import matplotlib.pyplot as plt
 
+
+'Reading data & converting to Matrix'
+
 df  = pd.read_csv( os.path.join('.','..','data','01_data_mars_opposition.csv') )
 
 def get_global_alpha_beta(df):
@@ -24,14 +27,13 @@ def indx_rad_phi(point,ix):
     x, y = point
     p1, p2, b = np.sin(beta[ix]-y), np.sin(alpha[ix]-y), np.cos(beta[ix]-alpha[ix])
     n1, n2, n3, d = 2*x*p1*p2*b , np.square(p1) , np.square(x*p2) , (1-np.square(b))
-    rad = np.sqrt( sum([n1,100*n2,100*n3]) / d )
+    rad = np.sqrt( sum([n1,n2,n3]) / d )
     phi = np.arcsin((x*p2)/rad)+alpha[ix]
     return rad, phi
 
 def obj_func(point,args):
     ls_radius = np.array( [indx_rad_phi(point,i)[0] for i in range(df.shape[0])] )
     return np.log(amean(ls_radius)) - np.log(gmean(ls_radius))
-
 
 s1, s2 = 1.15,0.25
 alpha, beta = get_global_alpha_beta(df)
