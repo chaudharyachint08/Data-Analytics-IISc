@@ -1,0 +1,15 @@
+Your goal is to identify genes which respond differently to smoke in men vs. women (Smoking Status X Gender model vs. Smoking Status + Gender null model)
+
+1. Use the 2-way ANOVA framework to generate p-values for each row of the data set
+
+2. Draw the histogram of p-values
+
+3. See if a better (than n estimate for n0 is derivable from this histogram; justify your estimate.
+
+4. Use an FDR cut-off of 0.05 to shortlist rows.
+
+5. Create a shortlist of gene symbols from these rows.
+
+6. Intersect with the following gene lists: Xenobiotic metabolism, Free Radical Response, DNA Repair, Natural Killer Cell Cytotoxicity. (Click on links to get the text files containing the lists.)
+
+7. Report intersection counts for each list, split into four groups; going down in women smokers vs. nonsmokers / going up in women smokers vs. nonsmokers. Do the same for men.
