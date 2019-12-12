@@ -1,0 +1,10 @@
+Models with their respective log-probabilities
+(1, -18.169618172698144)
+(2, -inf)
+(3, -15.440874470851508)
+(4, -24.960962895423386)
+
+
+The model having highest probability is
+3
+         

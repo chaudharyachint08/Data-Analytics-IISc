@@ -1,0 +1,6 @@
+Probability of model 1 is -67.84226592420478
+Probability of model 2 is -inf
+Probability of model 3 is -52.379571314812424
+Probability of model 4 is -110.37726048260386
+
+The model having highest probability is 3
